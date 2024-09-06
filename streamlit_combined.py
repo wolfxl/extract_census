@@ -190,5 +190,15 @@ def main():
                 st.subheader("Basic Statistics")
                 st.write(merged_data[variable_name].describe())
 
+                # Add download button for census data
+                st.subheader("Download Census Data")
+                csv = merged_data.to_csv(index=False)
+                st.download_button(
+                    label="Download Census Data as CSV",
+                    data=csv,
+                    file_name="census_data.csv",
+                    mime="text/csv",
+                )
+
 if __name__ == "__main__":
     main()
