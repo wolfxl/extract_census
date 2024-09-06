@@ -1,7 +1,6 @@
 import os
 import requests
 import folium
-import streamlit as st
 from dotenv import load_dotenv
 from geopy.geocoders import Nominatim
 from geopy.exc import GeocoderTimedOut
@@ -9,7 +8,6 @@ import pygris
 import geopandas as gpd
 from shapely.geometry import Point
 import matplotlib.pyplot as plt
-from streamlit_folium import folium_static
 
 class GeocodingMap:
     def __init__(self):
@@ -31,7 +29,7 @@ class GeocodingMap:
             
             return county, state
         except GeocoderTimedOut:
-            st.error("The geocoding service timed out. Please try again.")
+            print("The geocoding service timed out. Please try again.")
             return None, None
 
     def geocode_address(self, address):
@@ -51,29 +49,43 @@ class GeocodingMap:
             else:
                 return None
         else:
-            st.error(f"Error: {response.status_code}")
+            print(f"Error: {response.status_code}")
             return None
 
     def get_block_group_data(self, state, county):
         try:
-            bg_data = pygris.block_groups(state=state, county=county)
+            bg_data = pygris.block_groups(state=state, county=county, year=2022, cb=True)
             return bg_data
         except Exception as e:
-            st.error(f"Error fetching block group data: {e}")
+            print(f"Error fetching block group data: {e}")
             return None
 
     def create_buffer_and_clip(self, latitude, longitude, block_group_data, buffer_miles=3):
+        # Create a point from the lat/lon
         point = Point(longitude, latitude)
+        
+        # Create a GeoDataFrame with the point
         point_gdf = gpd.GeoDataFrame(geometry=[point], crs="EPSG:4326")
+        
+        # Reproject to a projected CRS for accurate buffer
         point_projected = point_gdf.to_crs(epsg=3857)
-        buffer = point_projected.buffer(4828.03)  # 3 miles in meters
+        
+        # Create buffer (3 miles = 4828.03 meters)
+        buffer = point_projected.buffer(4828.03)
+        
+        # Reproject buffer back to WGS84
         buffer_wgs84 = buffer.to_crs(epsg=4326)
+        
+        # Clip block groups with buffer
         clipped_bg = gpd.clip(block_group_data, buffer_wgs84)
+        
         return clipped_bg, buffer_wgs84
 
-    def create_map(self, latitude, longitude, address, county, state, clipped_bg, buffer):
+    def plot_clipped_map(self, latitude, longitude, address, county, state, clipped_bg, buffer):
+        # Create a base map
         m = folium.Map(location=[latitude, longitude], zoom_start=12)
 
+        # Add marker for the address
         popup_text = f"{address}<br>County: {county}<br>State: {state}"
         folium.Marker(
             [latitude, longitude],
@@ -81,6 +93,7 @@ class GeocodingMap:
             tooltip=address
         ).add_to(m)
 
+        # Add clipped block group boundaries
         folium.GeoJson(
             clipped_bg,
             style_function=lambda feature: {
@@ -91,6 +104,7 @@ class GeocodingMap:
             }
         ).add_to(m)
 
+        # Add buffer
         folium.GeoJson(
             buffer,
             style_function=lambda feature: {
@@ -101,7 +115,8 @@ class GeocodingMap:
             }
         ).add_to(m)
 
-        return m
+        m.save("clipped_map.html")
+        print("Map saved as 'clipped_map.html'")
 
     def process_address(self, address):
         result = self.geocode_address(address)
@@ -109,51 +124,35 @@ class GeocodingMap:
         if result:
             latitude = result['latitude']
             longitude = result['longitude']
-            st.write(f"Coordinates for {address}:")
-            st.write(f"Latitude: {latitude}")
-            st.write(f"Longitude: {longitude}")
+            print(f"Coordinates for {address}:")
+            print(f"Latitude: {latitude}")
+            print(f"Longitude: {longitude}")
             
             county, state = self.get_location_info(latitude, longitude)
             if county and state:
-                st.write(f"County: {county}")
-                st.write(f"State: {state}")
+                print(f"County: {county}")
+                print(f"State: {state}")
                 
                 block_group_data = self.get_block_group_data(state, county)
                 if block_group_data is not None:
-                    st.success("Successfully retrieved block group data.")
+                    print("Successfully retrieved block group data.")
                     
                     clipped_bg, buffer = self.create_buffer_and_clip(latitude, longitude, block_group_data)
-                    st.success("Created buffer and clipped block group data.")
+                    print("Created buffer and clipped block group data.")
                     
-                    map = self.create_map(latitude, longitude, address, county, state, clipped_bg, buffer)
-                    folium_static(map)
+                    self.plot_clipped_map(latitude, longitude, address, county, state, clipped_bg, buffer)
                 else:
-                    st.error("Failed to retrieve block group data.")
+                    print("Failed to retrieve block group data.")
             else:
-                st.error("Couldn't retrieve county and state information.")
+                print("Couldn't retrieve county and state information.")
         else:
-            st.error("Geocoding failed or no results found.")
+            print("Geocoding failed or no results found.")
 
-def main():
-    st.title("Address Geocoding and Block Group Mapping")
-    
+# Example usage
+if __name__ == "__main__":
     try:
         geocoding_map = GeocodingMap()
-        
-        address = st.text_input("Please enter an address:")
-        
-        if st.button("Process Address"):
-            if address:
-                geocoding_map.process_address(address)
-            else:
-                st.warning("Please enter an address.")
-    
+        address = input("Please enter an address: ")
+        geocoding_map.process_address(address)
     except ValueError as e:
-        st.error(f"Error: {e}")
-
-if __name__ == "__main__":
-    main()
-
-
-
-    
+        print(f"Error: {e}")
