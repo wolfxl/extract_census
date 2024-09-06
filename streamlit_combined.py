@@ -165,9 +165,8 @@ def main():
     combined_census_map = CombinedCensusMap()
 
     # User input
-    address = st.text_input("Enter an address:", "817 Lismore Dr. Frisco")
-    census_request = st.text_input("Enter your census data request:", 
-                                   "please download the total population and median household income for 2021 at block group level.")
+    address = st.text_input("Enter an address:")
+    census_request = st.text_input("Enter your census data request:")
 
     if st.button("Generate Map"):
         with st.spinner("Processing request..."):
