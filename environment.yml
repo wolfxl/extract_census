@@ -1,0 +1,22 @@
+name: census-data-project
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.12
+  - pip
+  - pip:
+    - os
+    - requests
+    - folium
+    - streamlit
+    - python-dotenv
+    - geopy
+    - pygris
+    - geopandas
+    - matplotlib
+    - streamlit-folium
+    - plotly
+    - openai
+    - pandas
+    - shapely
